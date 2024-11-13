@@ -1,0 +1,45 @@
+name: CI
+on:
+  push:
+    branches: ['*']
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        perl: ['5.22', '5.32', '5.40']
+    name: Linux / Perl ${{ matrix.perl }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: ${{ matrix.perl }}
+      - run: cpanm -n Devel::PPPort XS::Parse::Keyword
+      - run: perl Makefile.PL && make && make test
+
+  macos:
+    runs-on: macos-latest
+    name: macOS / Perl 5.40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.40'
+      - run: cpanm -n Devel::PPPort XS::Parse::Keyword
+      - run: perl Makefile.PL && make && make test
+
+  freebsd:
+    runs-on: ubuntu-latest
+    name: FreeBSD
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          prepare: pkg install -y perl5 p5-App-cpanminus
+          run: |
+            cpanm -n Devel::PPPort XS::Parse::Keyword
+            perl Makefile.PL && make && make test

@@ -1,0 +1,14 @@
+CLAUDE.md
+blib/
+Makefile
+Makefile.old
+MYMETA.*
+pm_to_blib
+ppport.h
+HashMap.c
+HashMap.o
+HashMap.bs
+*.xsc
+*.bs
+*.o
+*.tar.gz
