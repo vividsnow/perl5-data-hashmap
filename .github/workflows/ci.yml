@@ -17,8 +17,61 @@ jobs:
       - uses: shogo82148/actions-setup-perl@v1
         with:
           perl-version: ${{ matrix.perl }}
-      - run: cpanm -n Devel::PPPort XS::Parse::Keyword
+      - run: cpanm -n Devel::PPPort XS::Parse::Keyword Test::LeakTrace BSD::Resource
       - run: perl Makefile.PL && make && make test
+      - run: prove -lb xt/
+
+  threads:
+    runs-on: ubuntu-latest
+    name: Linux / Perl 5.40 threaded
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.40'
+          multi-thread: true
+      - run: perl -MConfig -e 'die "perl is not built with ithreads\n" unless $Config{useithreads}'
+      - run: cpanm -n Devel::PPPort XS::Parse::Keyword Test::LeakTrace BSD::Resource
+      - run: perl Makefile.PL && make && make test
+      - run: prove -lb xt/
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    name: Linux / ASan + UBSan
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.40'
+      - run: cpanm -n Devel::PPPort XS::Parse::Keyword Test::LeakTrace BSD::Resource
+      - run: |
+          perl Makefile.PL OPTIMIZE="-g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer"
+          make
+          nm -D blib/arch/auto/Data/HashMap/HashMap.so | grep -q __asan_ || { echo "HashMap.so is not instrumented"; exit 1; }
+      - run: |
+          export LD_PRELOAD="$(gcc -print-file-name=libasan.so) $(gcc -print-file-name=libubsan.so)"
+          prove -lb t/ xt/
+        env:
+          ASAN_OPTIONS: detect_leaks=0:allocator_may_return_null=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+
+  dist:
+    runs-on: ubuntu-latest
+    name: Distribution
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.40'
+      - run: cpanm -n Devel::PPPort XS::Parse::Keyword Test::LeakTrace BSD::Resource
+      - run: perl Makefile.PL
+      - name: MANIFEST in sync
+        run: |
+          perl -MExtUtils::Manifest=fullcheck -e '
+            my ($missing, $extra) = fullcheck();
+            die "MANIFEST out of sync\n" if @$missing || @$extra;
+          '
+      - run: make disttest
 
   macos:
     runs-on: macos-latest
@@ -28,8 +81,9 @@ jobs:
       - uses: shogo82148/actions-setup-perl@v1
         with:
           perl-version: '5.40'
-      - run: cpanm -n Devel::PPPort XS::Parse::Keyword
+      - run: cpanm -n Devel::PPPort XS::Parse::Keyword Test::LeakTrace BSD::Resource
       - run: perl Makefile.PL && make && make test
+      - run: prove -lb xt/
 
   freebsd:
     runs-on: ubuntu-latest
@@ -41,5 +95,6 @@ jobs:
           usesh: true
           prepare: pkg install -y perl5 p5-App-cpanminus
           run: |
-            cpanm -n Devel::PPPort XS::Parse::Keyword
+            cpanm -n Devel::PPPort XS::Parse::Keyword Test::LeakTrace BSD::Resource
             perl Makefile.PL && make && make test
+            prove -lb xt/

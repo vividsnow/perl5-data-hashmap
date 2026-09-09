@@ -12,3 +12,4 @@ HashMap.bs
 *.bs
 *.o
 *.tar.gz
+.pcg/
